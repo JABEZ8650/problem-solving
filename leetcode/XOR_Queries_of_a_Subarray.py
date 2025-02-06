@@ -1,0 +1,1 @@
+# Solution for XOR_Queries_of_a_Subarray

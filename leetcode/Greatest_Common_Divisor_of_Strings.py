@@ -1,0 +1,1 @@
+# Solution for Greatest_Common_Divisor_of_Strings

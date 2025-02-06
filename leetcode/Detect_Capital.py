@@ -1,0 +1,1 @@
+# Solution for Detect_Capital

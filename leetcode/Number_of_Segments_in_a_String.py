@@ -1,0 +1,1 @@
+# Solution for Number_of_Segments_in_a_String

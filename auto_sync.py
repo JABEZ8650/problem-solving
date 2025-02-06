@@ -19,29 +19,36 @@ CODEFORCES_API_URL = f"https://codeforces.com/api/user.status?handle={CODEFORCES
 
 
 def fetch_leetcode_submissions():
-    """Scrape the latest accepted LeetCode submissions."""
-    url = f"https://leetcode.com/{LEETCODE_USERNAME}/submissions/"
-    response = requests.get(url)
+    """Fetch LeetCode submissions using GraphQL API."""
+    url = "https://leetcode.com/graphql"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "query": """
+        query recentAcSubmissions($username: String!) {
+            recentAcSubmissionList(username: $username) {
+                title
+                timestamp
+            }
+        }
+        """,
+        "variables": {"username": LEETCODE_USERNAME}
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+
     if response.status_code != 200:
-        print("❌ Failed to fetch LeetCode submissions.")
+        print(f"❌ Failed to fetch LeetCode submissions. Status Code: {response.status_code}")
         return []
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    data = response.json()
+    if "data" not in data or "recentAcSubmissionList" not in data["data"]:
+        print("❌ LeetCode API response format changed or no data available.")
+        return []
+
     submissions = []
-
-    for row in soup.find_all("tr"):
-        cols = row.find_all("td")
-        if len(cols) < 4:
-            continue
-
-        status = cols[2].text.strip()
-        if status != "Accepted":
-            continue
-
-        problem_name = cols[1].text.strip().replace(" ", "_")
-        language = cols[3].text.strip()
-
-        submissions.append((problem_name, language))
+    for sub in data["data"]["recentAcSubmissionList"]:
+        problem_name = sub["title"].replace(" ", "_")
+        submissions.append((problem_name, "Python"))  # Defaulting to Python
 
     return submissions
 
@@ -50,10 +57,14 @@ def fetch_codeforces_submissions():
     """Fetch the latest accepted Codeforces submissions via API."""
     response = requests.get(CODEFORCES_API_URL)
     if response.status_code != 200:
-        print("❌ Failed to fetch Codeforces submissions.")
+        print(f"❌ Failed to fetch Codeforces submissions. Status Code: {response.status_code}")
         return []
 
     data = response.json()
+    if "result" not in data:
+        print("❌ Codeforces API response format changed.")
+        return []
+
     submissions = []
 
     for sub in data["result"]:
@@ -67,6 +78,8 @@ def fetch_codeforces_submissions():
 
 def save_submission(folder, problem_name, language, code=""):
     """Save the submission to the correct folder with a structured filename."""
+    os.makedirs(folder, exist_ok=True)  # Ensure folder exists
+
     ext_map = {
         "Python": ".py",
         "C++": ".cpp",
@@ -86,10 +99,15 @@ def save_submission(folder, problem_name, language, code=""):
 def commit_and_push():
     """Automatically commit and push the new submissions."""
     repo = Repo(GITHUB_REPO_PATH)
-    repo.git.add(all=True)
-    repo.index.commit(GITHUB_COMMIT_MESSAGE)
-    repo.remotes.origin.push()
-    print("🚀 Pushed updates to GitHub!")
+    
+    # Check for changes before committing
+    if repo.is_dirty(untracked_files=True):
+        repo.git.add(all=True)
+        repo.index.commit(GITHUB_COMMIT_MESSAGE)
+        repo.remotes.origin.push()
+        print("🚀 Pushed updates to GitHub!")
+    else:
+        print("✅ No new changes to push.")
 
 
 def main():

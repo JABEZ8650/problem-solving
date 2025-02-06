@@ -1,0 +1,1 @@
+# Solution for Repeated_Substring_Pattern
